@@ -1,5 +1,25 @@
 package com.yxh.myeyes;
 
+import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+//import android.graphics.Rect;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.Toast;
+
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
@@ -9,48 +29,30 @@ import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
-import androidx.camera.core.impl.ImageAnalysisConfig;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import android.Manifest;
-import android.content.ContentValues;
-import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.ImageFormat;
-import android.graphics.Matrix;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
-import android.graphics.drawable.BitmapDrawable;
-import android.net.Uri;
-import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.HandlerThread;
-import android.provider.MediaStore;
-import android.util.Log;
-import android.view.Gravity;
-import android.view.View;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.Toast;
-
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfRect;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.objdetect.CascadeClassifier;
+import org.opencv.core.Scalar;
+import org.opencv.core.Rect;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.concurrent.ExecutionException;
@@ -66,6 +68,19 @@ public class MainActivity extends AppCompatActivity {
     private PreviewView viewFinder;
     private ViewCanvas viewCanvas;
     private ImageView ivBitmap;
+
+    private Mat mRgba;
+    private Mat mGray;
+    private File mCascadeFile;
+    private CascadeClassifier mJavaDetector;
+
+    private float mRelativeFaceSize = 0.07f;
+    private int mAbsoluteFaceSize = 0;
+
+    private Rect[] facesArray = null;
+
+
+    private static final Scalar    FACE_RECT_COLOR     = new Scalar(0, 255, 0, 255);
 
     private File outputDirectory;
     private ExecutorService cameraExecutor;
@@ -89,6 +104,35 @@ public class MainActivity extends AppCompatActivity {
                     toast.setGravity(Gravity.CENTER, 0, 0);
                     toast.show();
                     mat = new Mat();
+
+                    try {
+                        // load cascade file from application resources
+                        InputStream is = getResources().openRawResource(R.raw.lbpcascade_frontalface);
+                        File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
+                        mCascadeFile = new File(cascadeDir, "lbpcascade_frontalface.xml");
+                        FileOutputStream os = new FileOutputStream(mCascadeFile);
+
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = is.read(buffer)) != -1) {
+                            os.write(buffer, 0, bytesRead);
+                        }
+                        is.close();
+                        os.close();
+
+                        mJavaDetector = new CascadeClassifier(mCascadeFile.getAbsolutePath());
+                        if (mJavaDetector.empty()) {
+                            Log.e(TAG, "Failed to load cascade classifier");
+                            mJavaDetector = null;
+                        } else
+                            Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
+
+                        cascadeDir.delete();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        Log.e(TAG, "Failed to load cascade. Exception thrown: " + e);
+                    }
                     break;
                 default:
                     super.onManagerConnected(status);
@@ -267,23 +311,26 @@ public class MainActivity extends AppCompatActivity {
         return imageFormatConvert.nv21ToBitmap(nv21, image.getWidth(), image.getHeight());
     }
 
-    private void imageAnalyzerFunc(ImageProxy image){
+    private void imageAnalyzerFunc(ImageProxy image) {
         Date startDate = new Date();
         bitImage = toBitmap(image);
         // Log.e(TAG, "当前帧亮度:" + (ave / dst.length));
         // 设置旋转角度
         matrix.setRotate(90);
         // 调整图片大小，放大到PreviewView大小
-        matrix.postScale((float)viewFinder.getWidth()/bitImage.getHeight(), (float)viewFinder.getHeight()/bitImage.getWidth()); //此时bitImage处于旋转90度状态
+       //matrix.postScale((float) viewFinder.getWidth() / bitImage.getHeight(), (float) viewFinder.getHeight() / bitImage.getWidth()); //此时bitImage处于旋转90度状态
         // 重新绘制Bitmap
-        //bitImage = Bitmap.createBitmap(bitImage, 0, 0, viewFinder.getWidth(), viewFinder.getHeight(), matrix, true);
         bitImage = Bitmap.createBitmap(bitImage, 0, 0, bitImage.getWidth(), bitImage.getHeight(), matrix, true);
         Utils.bitmapToMat(bitImage, mat);
         Imgproc.cvtColor(mat, mat, currentImageType);
-        Utils.matToBitmap(mat, bitImage);
+        facesArray = onCameraFrame(mat);
+
         Date endDate = new Date();
         long diff = endDate.getTime() - startDate.getTime();
         Log.e(TAG, "处理时间差:" + diff);
+
+        //Utils.matToBitmap(mat, bitImage);
+
 //        viewCanvas.post(new Runnable() {
 //            @Override
 //            public void run() {
@@ -298,7 +345,9 @@ public class MainActivity extends AppCompatActivity {
 //                Matrix matrix = new Matrix();
 //                matrix.postScale(0.5f, 0.5f);
 //                canvas.drawBitmap(mBitmap, matrix,null);
-                viewCanvas.setBitmap(bitImage);
+
+                //viewCanvas.setBitmap(bitImage);
+                viewCanvas.drawtarget(facesArray, (float) viewFinder.getWidth() / bitImage.getHeight(), (float) viewFinder.getHeight() / bitImage.getWidth());
             }
         });
     }
@@ -313,5 +362,40 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "OpenCV library found inside package. Using it!");
             mLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
         }
+    }
+
+    public void onCameraViewStarted(int width, int height) {
+        mGray = new Mat();
+        mRgba = new Mat();
+    }
+
+    public void onCameraViewStopped() {
+        mGray.release();
+        mRgba.release();
+    }
+
+    public Rect[] onCameraFrame(Mat mGray) {
+
+        //mRgba = inputFrame.rgba();
+        //mGray = inputFrame.gray();
+
+        if (mAbsoluteFaceSize == 0) {
+            int height = mGray.rows();
+            if (Math.round(height * mRelativeFaceSize) > 0) {
+                mAbsoluteFaceSize = Math.round(height * mRelativeFaceSize);
+            }
+        }
+
+        MatOfRect faces = new MatOfRect();
+        if (mJavaDetector != null)
+            mJavaDetector.detectMultiScale(mGray, faces, 1.1, 4, 2, // TODO: objdetect.CV_HAAR_SCALE_IMAGE
+                    new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
+
+
+//        Rect[] facesArray = faces.toArray();
+//        for (int i = 0; i < facesArray.length; i++)
+//            Imgproc.rectangle(mGray, facesArray[i].tl(), facesArray[i].br(), FACE_RECT_COLOR, 3);
+
+        return faces.toArray();
     }
 }
