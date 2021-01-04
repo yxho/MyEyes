@@ -7,7 +7,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
-//import android.graphics.Rect;
+
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -22,6 +22,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.AspectRatio;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
@@ -43,7 +44,7 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
-import org.opencv.core.Size;
+import org.opencv.core.Size ;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.core.Scalar;
@@ -188,7 +189,7 @@ public class MainActivity extends AppCompatActivity {
                             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                             .build();
 
-                    imageAnalyzer = new ImageAnalysis.Builder()
+                    imageAnalyzer = new ImageAnalysis.Builder().setTargetAspectRatio(AspectRatio.RATIO_16_9)//设置长宽比与PreviewView一致
                             .build();
                     // 图片转换类初始化
                     imageFormatConvert = new ImageFormatConvert(MainActivity.this);
@@ -284,41 +285,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    private Bitmap toBitmap(ImageProxy image) {
-        ImageProxy.PlaneProxy[] planes = image.getPlanes();
-        ByteBuffer yBuffer = planes[0].getBuffer();
-        ByteBuffer uBuffer = planes[1].getBuffer();
-        ByteBuffer vBuffer = planes[2].getBuffer();
-        int ySize = yBuffer.remaining();
-        int uSize = uBuffer.remaining();
-        int vSize = vBuffer.remaining();
-
-        byte[] nv21 = new byte[ySize + uSize + vSize];
-
-        //U and V are swapped
-        yBuffer.get(nv21, 0, ySize);
-        vBuffer.get(nv21, ySize, vSize);
-        uBuffer.get(nv21, ySize + vSize, uSize);
-
-//        传统方法 比较慢
-//        YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, image.getWidth(), image.getHeight(), null);
-//        ByteArrayOutputStream out = new ByteArrayOutputStream();
-//        yuvImage.compressToJpeg(new Rect(0, 0, yuvImage.getWidth(), yuvImage.getHeight()), 50, out);
-//
-//        byte[] imageBytes = out.toByteArray();
-//        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-
-        return imageFormatConvert.nv21ToBitmap(nv21, image.getWidth(), image.getHeight());
-    }
-
     private void imageAnalyzerFunc(ImageProxy image) {
         Date startDate = new Date();
-        bitImage = toBitmap(image);
+        bitImage = imageFormatConvert.imageProxyToBitmap(image);
         // Log.e(TAG, "当前帧亮度:" + (ave / dst.length));
         // 设置旋转角度
         matrix.setRotate(90);
         // 调整图片大小，放大到PreviewView大小
-       //matrix.postScale((float) viewFinder.getWidth() / bitImage.getHeight(), (float) viewFinder.getHeight() / bitImage.getWidth()); //此时bitImage处于旋转90度状态
+        //matrix.postScale((float) viewFinder.getWidth() / bitImage.getHeight(), (float) viewFinder.getHeight() / bitImage.getWidth()); //此时bitImage处于旋转90度状态
         // 重新绘制Bitmap
         bitImage = Bitmap.createBitmap(bitImage, 0, 0, bitImage.getWidth(), bitImage.getHeight(), matrix, true);
         Utils.bitmapToMat(bitImage, mat);
@@ -329,25 +303,18 @@ public class MainActivity extends AppCompatActivity {
         long diff = endDate.getTime() - startDate.getTime();
         Log.e(TAG, "处理时间差:" + diff);
 
-        //Utils.matToBitmap(mat, bitImage);
+        Utils.matToBitmap(mat, bitImage);
 
 //        viewCanvas.post(new Runnable() {
 //            @Override
 //            public void run() {
-//                //ivBitmap.setImageBitmap(bitImage);
-//                viewCanvas.setBitmap(bitImage);
 //            }
 //        });
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                //ivBitmap.setImageBitmap(bitImage);
-//                Matrix matrix = new Matrix();
-//                matrix.postScale(0.5f, 0.5f);
-//                canvas.drawBitmap(mBitmap, matrix,null);
-
-                //viewCanvas.setBitmap(bitImage);
-                viewCanvas.drawtarget(facesArray, (float) viewFinder.getWidth() / bitImage.getHeight(), (float) viewFinder.getHeight() / bitImage.getWidth());
+                viewCanvas.setBitmap(bitImage);
+                viewCanvas.drawtarget(facesArray, (float) viewFinder.getWidth() / bitImage.getWidth(), (float) viewFinder.getHeight() / bitImage.getHeight());
             }
         });
     }
@@ -375,10 +342,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public Rect[] onCameraFrame(Mat mGray) {
-
-        //mRgba = inputFrame.rgba();
-        //mGray = inputFrame.gray();
-
         if (mAbsoluteFaceSize == 0) {
             int height = mGray.rows();
             if (Math.round(height * mRelativeFaceSize) > 0) {
@@ -390,7 +353,6 @@ public class MainActivity extends AppCompatActivity {
         if (mJavaDetector != null)
             mJavaDetector.detectMultiScale(mGray, faces, 1.1, 4, 2, // TODO: objdetect.CV_HAAR_SCALE_IMAGE
                     new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
-
 
 //        Rect[] facesArray = faces.toArray();
 //        for (int i = 0; i < facesArray.length; i++)

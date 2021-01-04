@@ -8,6 +8,8 @@ import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 
+import androidx.camera.core.ImageProxy;
+
 import java.nio.ByteBuffer;
 
 /**
@@ -60,6 +62,33 @@ public class ImageFormatConvert {
 
         return bmpout;
 
+    }
+
+    public Bitmap imageProxyToBitmap(ImageProxy image) {
+        ImageProxy.PlaneProxy[] planes = image.getPlanes();
+        ByteBuffer yBuffer = planes[0].getBuffer();
+        ByteBuffer uBuffer = planes[1].getBuffer();
+        ByteBuffer vBuffer = planes[2].getBuffer();
+        int ySize = yBuffer.remaining();
+        int uSize = uBuffer.remaining();
+        int vSize = vBuffer.remaining();
+
+        byte[] nv21 = new byte[ySize + uSize + vSize];
+
+        //U and V are swapped
+        yBuffer.get(nv21, 0, ySize);
+        vBuffer.get(nv21, ySize, vSize);
+        uBuffer.get(nv21, ySize + vSize, uSize);
+
+//        传统方法 比较慢
+//        YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, image.getWidth(), image.getHeight(), null);
+//        ByteArrayOutputStream out = new ByteArrayOutputStream();
+//        yuvImage.compressToJpeg(new Rect(0, 0, yuvImage.getWidth(), yuvImage.getHeight()), 50, out);
+//
+//        byte[] imageBytes = out.toByteArray();
+//        return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+
+        return nv21ToBitmap(nv21, image.getWidth(), image.getHeight());
     }
 
 }
