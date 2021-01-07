@@ -18,7 +18,8 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyEyes">
-        <activity android:name=".PreviewViewActivity"></activity>
+        <activity android:name=".ImageProcessActivity"></activity>
+        <activity android:name=".PreviewViewActivity" />
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

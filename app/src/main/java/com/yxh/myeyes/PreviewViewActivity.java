@@ -73,7 +73,8 @@ public class PreviewViewActivity extends AppCompatActivity {
         camera_capture_button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                takePhoto();
+                //takePhoto();
+                onBackPressed();
             }
         });
 
