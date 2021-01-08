@@ -12,6 +12,7 @@ import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -23,15 +24,20 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.yxh.myeyes.ImageAnalysisAbility.ImageToPixelArt;
+
 public class ImageProcessActivity extends AppCompatActivity {
     public static final int CHOOSE_PHOTO = 2;
     private ImageView mImageView;
+    private ImageToPixelArt mImageToPixelArt = new ImageToPixelArt();
+    private Bitmap targetImage = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_process);
         Button imageChoose = findViewById(R.id.image_button);
+        Button paintImage = findViewById(R.id.image_handle);
         mImageView = findViewById(R.id.image_view);
         imageChoose.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -41,6 +47,32 @@ public class ImageProcessActivity extends AppCompatActivity {
                 } else {
                     openAlbum();
                 }
+            }
+        });
+
+        paintImage.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.e("TAG", "xxxgetBlockBitmap: ");
+//
+//                // 步骤1：通过匿名类 直接 创建线程辅助对象，即 实例化 线程辅助类
+//                Runnable mt = new Runnable() {
+//                    // 步骤2：复写run（），定义线程行为
+//                    @Override
+//                    public void run() {
+//                        targetImage=mImageToPixelArt.getBlockBitmap(targetImage,20);
+//                        Log.e("TAG", "xxxgetBlockBitmapoioooooo: ");
+//                    }
+//                };
+//
+//                // 步骤3：创建线程对象，即 实例化线程类；线程类 = Thread类；
+//                Thread mt1 = new Thread(mt, "窗口1");
+//
+//                // 步骤4：通过 线程对象 控制线程的状态，如 运行、睡眠、挂起  / 停止
+//                mt1.start();
+                //targetImage=mImageToPixelArt.makeTintBitmap(targetImage, Color.BLUE);
+                targetImage = mImageToPixelArt.getBlockBitmap(targetImage,300);
+                mImageView.setImageBitmap(targetImage);
             }
         });
 
@@ -145,6 +177,7 @@ public class ImageProcessActivity extends AppCompatActivity {
     private void displayImage(String imagePath) {
         if (imagePath != null) {
             Bitmap bitmap = BitmapFactory.decodeFile(imagePath);
+            targetImage = bitmap;
             mImageView.setImageBitmap(bitmap);
         } else {
             Toast.makeText(this, "failed to get image", Toast.LENGTH_SHORT).show();
