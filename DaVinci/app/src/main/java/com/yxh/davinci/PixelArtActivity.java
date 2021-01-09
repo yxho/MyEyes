@@ -57,7 +57,7 @@ public class PixelArtActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_image_process);
+        setContentView(R.layout.activity_pixel_art);
         Button imageChoose = findViewById(R.id.image_button);
         Button paintImage = findViewById(R.id.image_handle);
         mImageView = findViewById(R.id.image_view);
