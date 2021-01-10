@@ -14,21 +14,27 @@ using namespace cv;
 
 class ImageProcess {
 public:
-    ImageProcess(){};
+    ImageProcess() {};
 
-    ~ImageProcess(){};
+    ~ImageProcess() {};
 
-    Mat ImageDownsample(Mat &image, int time);
+    void ImageDownsample(Mat &image, int time);
 
-    Mat ImageUpsample(Mat &image, int time);
+    void ImageUpsample(Mat &image, int time);
 
     void ColorReduce(Mat &image, int div);
 
     void Salt(Mat &image, int n);
 
-    Mat Sharpen2D(Mat &image);
+    void Sharpen2D(Mat &image);
 
     void PixelArt(Mat &image);
+
+    void ImageToPixelBlock(Mat &image, int size, int ch);
+
+    int ImageBlockPixelMean(Mat &image, int x, int y, int size);
+
+    void ImagePixelBlockColor(Mat &image, int x, int y, int size, int color);
 
 
 };
