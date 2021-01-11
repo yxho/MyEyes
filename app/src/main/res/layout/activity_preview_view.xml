@@ -21,7 +21,7 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"/>
 
-    <com.yxh.myeyes.ViewCanvas
+    <com.yxh.davinci.ViewCanvas
         android:id = "@+id/viewCanvas"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
